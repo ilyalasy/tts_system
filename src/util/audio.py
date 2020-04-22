@@ -1,7 +1,7 @@
 import librosa
 import librosa.filters
 import numpy as np
-from hparams import hparams
+import hyperparams as hp
 from scipy.io import wavfile
 from scipy import signal
 
@@ -33,19 +33,19 @@ def load_wav(path):
     signed_int16_max = 2**15
     if x.dtype == np.int16:
         x = x.astype(np.float32) / signed_int16_max
-    if sr != hparams.sample_rate:
-        x = librosa.resample(x, sr, hparams.sample_rate)
+    if sr != hp.sample_rate:
+        x = librosa.resample(x, sr, hp.sample_rate)
     x = np.clip(x, -1.0, 1.0)
     return x
 
 
 def save_wav(wav, path):
     wav *= 32767 / max(0.01, np.max(np.abs(wav)))
-    wavfile.write(path, hparams.sample_rate, wav.astype(np.int16))
+    wavfile.write(path, hp.sample_rate, wav.astype(np.int16))
 
 
 def trim(quantized):
-    start, end = start_and_end_indices(quantized, hparams.silence_threshold)
+    start, end = start_and_end_indices(quantized, hp.silence_threshold)
     return quantized[start:end]
 
 
@@ -82,7 +82,7 @@ def adjust_time_resolution(quantized, mel):
         mel = np.pad(mel, [(0, n_pad), (0, 0)], mode="constant", constant_values=0)
 
     # trim
-    start, end = start_and_end_indices(quantized, hparams.silence_threshold)
+    start, end = start_and_end_indices(quantized, hp.silence_threshold)
 
     return quantized[start:end], mel[start:end, :]
 
@@ -113,25 +113,25 @@ def logmelspectrogram(y, pad_mode="reflect"):
 
 
 def get_hop_size():
-    hop_size = hparams.hop_size
+    hop_size = hp.hop_size
     if hop_size is None:
-        assert hparams.frame_shift_ms is not None
-        hop_size = int(hparams.frame_shift_ms / 1000 * hparams.sample_rate)
+        assert hp.frame_shift_ms is not None
+        hop_size = int(hp.frame_shift_ms / 1000 * hp.sample_rate)
     return hop_size
 
 
 def get_win_length():
-    win_length = hparams.win_length
+    win_length = hp.win_length
     if win_length < 0:
-        assert hparams.win_length_ms > 0
-        win_length = int(hparams.win_length_ms / 1000 * hparams.sample_rate)
+        assert hp.win_length_ms > 0
+        win_length = int(hp.win_length_ms / 1000 * hp.sample_rate)
     return win_length
 
 
 def _stft(y, pad_mode="constant"):
     # use constant padding (defaults to zeros) instead of reflection padding
-    return librosa.stft(y=y, n_fft=hparams.fft_size, hop_length=get_hop_size(),
-                        win_length=get_win_length(), window=hparams.window,
+    return librosa.stft(y=y, n_fft=hp.n_fft, hop_length=get_hop_size(),
+                        win_length=get_win_length(), window=hp.window,
                         pad_mode=pad_mode)
 
 
@@ -152,15 +152,15 @@ def _linear_to_mel(spectrogram):
 
 
 def _build_mel_basis():
-    if hparams.fmax is not None:
-        assert hparams.fmax <= hparams.sample_rate // 2
-    return librosa.filters.mel(hparams.sample_rate, hparams.fft_size,
-                               fmin=hparams.fmin, fmax=hparams.fmax,
-                               n_mels=hparams.num_mels)
+    if hp.fmax is not None:
+        assert hp.fmax <= hp.sample_rate // 2
+    return librosa.filters.mel(hp.sample_rate, hp.n_fft,
+                               fmin=hp.fmin, fmax=hp.fmax,
+                               n_mels=hp.n_mels)
 
 
 def _amp_to_db(x):
-    min_level = np.exp(hparams.min_level_db / 20 * np.log(10))
+    min_level = np.exp(hp.min_level_db / 20 * np.log(10))
     return 20 * np.log10(np.maximum(min_level, x))
 
 
@@ -168,9 +168,9 @@ def _db_to_amp(x):
     return np.power(10.0, x * 0.05)
 
 
-def _normalize(S):
-    return np.clip((S - hparams.min_level_db) / -hparams.min_level_db, 0, 1)
+def _normalize(S):  
+    return np.clip((S - hp.ref_db + hp.max_db) / hp.max_db, 0, 1)
 
 
 def _denormalize(S):
-    return (np.clip(S, 0, 1) * -hparams.min_level_db) + hparams.min_level_db
+    return (np.clip(S, 0, 1) * hp.max_db) + hp.ref_db - hp.max_db

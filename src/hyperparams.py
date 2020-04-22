@@ -12,12 +12,17 @@ def get_frames(duration, sr, hop_length, r):
 
 vocab='РЕ абвгдеёжзийклмнопрстуфхцчшщъыьэюя-.?'
 # signal processing
-sr = 22050 # Sampling rate.
+sample_rate = 22050 # Sampling rate.
+silence_threshold = 2
+fmin = 125
+fmax = 7600
 n_fft = 2048 # fft points (samples)
-frame_shift = 0.0125 # seconds
-frame_length = 0.05 # seconds
-hop_length = int(sr*frame_shift) # samples  This is dependent on the frame_shift.
-win_length = int(sr*frame_length) # samples This is dependent on the frame_length.
+hop_size = 256
+frame_shift_ms = None
+win_length = 1024
+win_length_ms = -1
+window = 'hann'
+highpass_cutoff = 70
 n_mels = 80 # Number of Mel banks to generate
 sharpening_factor = 1.4 # Exponent for amplifying the predicted magnitude
 n_iter = 50 # Number of inversion iterations
@@ -44,5 +49,11 @@ converter_channels = 256 # == v
 # DATA
 max_duration = 10 #seconds
 max_timesteps = 180 # max characters in sample
-max_frames = int(get_frames(max_duration, sr, hop_length, r))
+max_frames = int(get_frames(max_duration, sample_rate, hop_size, r))
 
+# TRAINING
+epochs=50
+lr=0.001
+max_grad_norm = 100.
+max_grad_val = 5.
+num_iterations = 500000

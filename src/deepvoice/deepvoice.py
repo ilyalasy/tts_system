@@ -3,7 +3,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 from tensorflow_addons.seq2seq import AttentionWrapper, BahdanauAttention, BasicDecoder,dynamic_decode
 
-import deepvoice.hyperparams as hp
+import hyperparams as hp
 
 import numpy as np
 
@@ -15,7 +15,7 @@ class DeepVoice(tf.keras.Model):
         self.decoder = Decoder()
         self.converter = Converter()
     
-    def call(self, inputs, mels, training=True, **kwargs): 
+    def call(self, inputs, mels, training=True): 
         keys, values = self.encoder(inputs,training)
         mel_output, done = self.decoder(mels, keys, values,training)
         mag_output = self.converter(mel_output, training)
