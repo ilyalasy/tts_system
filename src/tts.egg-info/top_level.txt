@@ -1,3 +1,0 @@
-deepvoice
-tacotron
-util
