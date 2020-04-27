@@ -75,11 +75,6 @@ class DataReader():
             batch_frames.append(size)
 
             if len(batch_x) == n:
-
-                # x = self._list_to_ragged(batch_x)
-                # mag = self._list_to_ragged(batch_mag)
-                # mel = self._list_to_ragged(batch_mel)
-                # dones = self._list_to_ragged(batch_dones)
                 
                 yield tf.convert_to_tensor(batch_x), \
                     tf.convert_to_tensor(batch_mag), \

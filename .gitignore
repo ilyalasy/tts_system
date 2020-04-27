@@ -1,3 +1,7 @@
 /data
 /Literature
 /logs
+src/*.egg-info
+eggs
+/.vscode
+vscode.env

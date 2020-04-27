@@ -10,6 +10,7 @@ setup(
     author_email="ilyalas@gmail.com",  
     packages=find_packages(),
     install_requires=[
-        # Skipping
+        'lws',
+        'librosa',
     ],
 )
