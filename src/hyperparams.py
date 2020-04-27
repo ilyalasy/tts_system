@@ -10,7 +10,7 @@ def get_frames(duration, sr, hop_length, r):
     return T
 
 
-vocab='РЕ абвгдеёжзийклмнопрстуфхцчшщъыьэюя-.?'
+vocab='РЕ абвгдеёжзийклмнопрстуфхцчшщъыьэюя.?'
 # signal processing
 sample_rate = 22050 # Sampling rate.
 silence_threshold = 2
@@ -27,14 +27,17 @@ n_mels = 80 # Number of Mel banks to generate
 sharpening_factor = 1.4 # Exponent for amplifying the predicted magnitude
 n_iter = 50 # Number of inversion iterations
 preemphasis = .97 # or None
-max_db = 100
+min_db = -100
 ref_db = 20
+allow_clipping_in_normalization = True
+
 
 # MODEL
-dropout=0.95
+dropout= 1 - 0.95
 r = 4 # Reduction factor
-num_filters=5
-kernel_size=3
+# num_filters=5
+kernel_size=5
+downsample_step=4
 # ENCODER
 embed_size=256
 num_channels=64
@@ -47,12 +50,15 @@ converter_layers = 5
 converter_channels = 256 # == v
 
 # DATA
+data_path = 'd:/Dev/ML/TTS/data/ru_audiobook_single_speaker/'
+transcript_path = 'transcript.txt'
 max_duration = 10 #seconds
-max_timesteps = 180 # max characters in sample
+max_timesteps = 100 # max characters throughout sample
 max_frames = int(get_frames(max_duration, sample_rate, hop_size, r))
 
 # TRAINING
 epochs=50
+batch_size=16
 lr=0.001
 max_grad_norm = 100.
 max_grad_val = 5.

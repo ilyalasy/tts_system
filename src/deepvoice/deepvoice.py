@@ -17,8 +17,18 @@ class DeepVoice(tf.keras.Model):
     
     def call(self, inputs, mels, training=True): 
         keys, values = self.encoder(inputs,training)
-        mel_output, done = self.decoder(mels, keys, values,training)
-        mag_output = self.converter(mel_output, training)
+
+        # Reduction
+        mels = tf.reshape(mels, (-1,hp.max_frames//hp.r,hp.n_mels * hp.r))
+        mels = tf.concat((tf.zeros_like(mels[:, :1, -hp.n_mels:]), mels[:, :-1, -hp.n_mels:]), axis=1) # Take evry 
+        
+        mel_output, done, dec_output = self.decoder(mels, keys, values,training)
+        
+        mag_output = self.converter(dec_output, training)
+
+        mel_output = tf.reshape(mel_output, (-1,hp.max_frames,mel_output.shape[2]//hp.r))
+        mag_output = tf.reshape(mag_output, (-1,hp.max_frames,mag_output.shape[2]//hp.r))
+        
         return mel_output, done, mag_output
         
 
@@ -30,7 +40,7 @@ class Encoder(layers.Layer):
        
         self.fc1 = layers.Dense(hp.num_channels)
 
-        self.convs = [ConvBlock(dilation=2**i) for i in range(hp.encoder_layers)]
+        self.convs = [ConvBlock(hp.num_channels * 2, dilation=2**i) for i in range(hp.encoder_layers)]
 
         self.fc2 = layers.Dense(hp.embed_size)
     
@@ -48,13 +58,13 @@ class Decoder(layers.Layer):
         super(Decoder, self).__init__(name=name)
 
         self.first_fc = layers.Dense(hp.embed_size,activation='relu')
-        self.dropouts = [layers.Dropout(hp.dropout,activation='relu') for _ in range(hp.decoder_layers) - 1]
-        self.fcs = [layers.Dense(hp.embed_size) for _ in range(hp.decoder_layers) - 1 ]
+        self.dropouts = [layers.Dropout(hp.dropout) for _ in range(hp.decoder_layers - 1)]
+        self.fcs = [layers.Dense(hp.embed_size,activation='relu') for _ in range(hp.decoder_layers - 1)]
 
-        self.convs = [ConvBlock(padding='causal', dilation=2**i) for i in range(hp.decoder_layers)]
+        self.convs = [ConvBlock(hp.embed_size * 2,padding='causal', dilation=2**i) for i in range(hp.decoder_layers)]
         self.attentions = [AttentionBlock(num_channels=hp.embed_size, query_pr=1.,key_pr=(hp.max_frames // hp.r) / hp.max_timesteps) for _ in range(hp.decoder_layers)]
-        self.fc_done = layers.Dense(2)
-        self.fc_mel = layers.Dense(hp.n_mels *hp.r)
+        self.fc_done = layers.Dense(2,activation='sigmoid')
+        self.fc_mel = layers.Dense(hp.n_mels * hp.r)
 
     def call(self, inputs, keys, values, training=True):
         fc_outputs = self.first_fc(inputs)
@@ -72,9 +82,10 @@ class Decoder(layers.Layer):
 
         done_output = self.fc_done(dec_output)
 
+
         mel_output = self.fc_mel(dec_output)
 
-        return mel_output, done_output
+        return mel_output, done_output, dec_output
 
 class AttentionBlock(layers.Layer):
     def __init__(self, num_channels, query_pr,key_pr,name='AttentionBlock'):
@@ -97,11 +108,10 @@ class AttentionBlock(layers.Layer):
         return pos * angle_rates
 
     def _get_pe(self, inputs,pos_rate):
-        _,_,timesteps = inputs.shape.as_list()
+        timesteps = inputs.shape.as_list()[1]
 
         position_enc = np.array([
-            [self._get_angles(pos, pos_rate,  i) for i in range(self.num_channels)]
-            for pos in range(timesteps)])
+            [self._get_angles(pos, pos_rate,  i) for i in range(self.num_channels)]for pos in range(timesteps)])
         
         # apply sin to even indices in the array; 2i
         position_enc[:, 0::2] = np.sin(position_enc[:, 0::2])
@@ -141,16 +151,17 @@ class AttentionBlock(layers.Layer):
         alignments = self.dropout(alignments,training)
 
         # context 
-        _,_,values_ts = values.shape.as_list()
+        values_ts = values.shape.as_list()[1]
         context = tf.matmul(alignments, values_out)
         context *= tf.math.rsqrt(tf.cast(values_ts, dtype=tf.float32))
 
         return self.fc_out(context)
 
 class ConvBlock(layers.Layer):
-    def __init__(self,name='ConvBlock',padding='valid', dilation=1):
+    def __init__(self, output_size, padding='same', dilation=1,name='ConvBlock'):
+        super(ConvBlock, self).__init__(name=name)
         self.dropout= layers.Dropout(hp.dropout)
-        self.conv = layers.Conv1D(hp.num_filters, hp.kernel_size,
+        self.conv = layers.Conv1D(output_size, hp.kernel_size,
                                     padding=padding,
                                     dilation_rate=dilation,
                                     kernel_initializer='glorot_normal')
@@ -175,18 +186,20 @@ class Converter(layers.Layer):
     def __init__(self, vocoder_type='griffin-lim', name='Converter'):
         super(Converter, self).__init__(name=name)
 
-        # TODO: WORLD, WAVENET
-        assert vocoder_type == 'griffin-lim'
+        self.convs = [ConvBlock(hp.embed_size * 2,dilation=2**i) for i in range(hp.converter_layers)]
+        self.fc_out = layers.Dense(hp.converter_channels)
 
-        self.convs = [ConvBlock(dilation=2**i,padding='SAME') for i in range(hp.converter_layers)]
-        self.fc_out = layers.Dense(hp.n_fft//2 + 1)
+        # TODO: WORLD
+        assert vocoder_type == 'griffin-lim'
+        self.fc_gl = layers.Dense((hp.n_fft // 2 + 1) * hp.r)
 
     def call(self, inputs,training):
         conv_input = inputs
         for conv in self.convs:
             conv_input = conv(conv_input,training)
 
-        mag_out = self.fc_out(conv_input) ** hp.sharpening_factor
+        out = self.fc_out(conv_input)
+        mag_out = self.fc_gl(out) 
         return mag_out
 
 

@@ -9,9 +9,6 @@ def get_vocab():
     return char2idx, idx2char
 
 def text_normalize(text):
-    text = ''.join(char for char in unicodedata.normalize('NFD', text)
-                           if unicodedata.category(char) != 'Mn') # Strip accents
-
     text = text.lower()
     text = re.sub("[^{}]".format(hp.vocab), " ", text)
     text = re.sub("[ ]+", " ", text)
