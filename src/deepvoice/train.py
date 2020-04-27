@@ -86,9 +86,6 @@ def train():
           tf.summary.scalar('dones', loss_done, step=optimizer.iterations.numpy())
           tf.summary.scalar('mags', loss_mag, step=optimizer.iterations.numpy())
       
-      mae.reset_states()
-      ce.reset_states()
-      
       # if epoch % 2 == 0:
       time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
       checkpoints_path = checkpoints_dir + time + ''
