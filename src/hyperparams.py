@@ -50,7 +50,7 @@ converter_layers = 5
 converter_channels = 256 # == v
 
 # DATA
-data_path = 'd:/Dev/ML/TTS/data/ru_audiobook_single_speaker/'
+data_path = '/data/ru_audiobook_single_speaker/'
 transcript_path = 'transcript.txt'
 max_duration = 10 #seconds
 max_timesteps = 100 # max characters throughout sample
